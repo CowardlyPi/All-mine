@@ -1,0 +1,10 @@
+# Core libraries
+discord.py==2.3.2
+openai==1.6.1
+
+# Machine learning libraries
+transformers==4.35.2
+torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
+
+# Additional utilities
+matplotlib==3.7.2
