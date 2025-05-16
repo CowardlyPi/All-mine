@@ -1689,7 +1689,6 @@ class A2Bot:
         
         # Set up OpenAI client
         self.openai_client = OpenAI(api_key=openai_api_key)
-        )
         
         # Initialize managers
         self.storage_manager = StorageManager(DATA_DIR, USERS_DIR, PROFILES_DIR, DM_SETTINGS_FILE, 
