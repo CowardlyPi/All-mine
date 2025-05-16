@@ -692,62 +692,8 @@ class StorageManager:
         print("Data load complete")
         return profile_count > 0  # Return success indicator
         
-async def save_data(self, emotion_manager, conversation_manager=None):
-    """Save all user data with improved error handling"""
-    save_count = 0
-    error_count = 0
-    
-    # Ensure directories exist
-    if not self.verify_data_directories():
-        print("ERROR: Data directories not available. Cannot save.")
-        return False
-    
-    print("Beginning data save process...")
-    
-    # Batch save all user profiles
-    for uid in emotion_manager.user_emotions:
-        try:
-            success = await self.save_user_profile(uid, emotion_manager)
-            if success:
-                save_count += 1
-            else:
-                error_count += 1
-        except Exception as e:
-            error_count += 1
-            print(f"Error saving profile for user {uid}: {e}")
-    
-    # Save user profiles (only if conversation_manager is provided)
-    profile_save_count = 0
-    if conversation_manager is not None:
-        for uid, profile in conversation_manager.user_profiles.items():
-            try:
-                success = await self.save_user_profile_data(uid, profile)
-                if success:
-                    profile_save_count += 1
-            except Exception as e:
-                print(f"Error saving user profile for {uid}: {e}")
-    
-        # Save conversations and summaries
-        conv_save_count = 0
-        for uid in conversation_manager.conversations:
-            try:
-                success = await self.save_conversation(uid, conversation_manager)
-                if success:
-                    conv_save_count += 1
-            except Exception as e:
-                print(f"Error saving conversation for {uid}: {e}")
-        
-        print(f"Saved {profile_save_count} user profiles")
-        print(f"Saved {conv_save_count} conversations")
-    
-    # Save DM settings
-    await self.save_dm_settings(emotion_manager.dm_enabled_users)
-    
-    print(f"Saved {save_count} profiles with {error_count} errors")
-    return save_count > 0
-
-    class EmotionManager:
-        """Manages all emotional and relationship aspects of the bot"""
+class EmotionManager:
+    """Manages all emotional and relationship aspects of the bot"""
     
     def __init__(self):
         # ─── State Storage ────────────────────────────────────────────────────
