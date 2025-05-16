@@ -1615,22 +1615,21 @@ class ResponseGenerator:
         if storage_manager:
             await storage_manager.save_data(self.emotion_manager, self.conversation_manager)
     
-    async def check_inactive_users(self, bot, storage_manager=None):
-        """Check and message inactive users"""
-        now = datetime.now(timezone.utc)
-        for guild in bot.guilds:
-            for member in guild.members:
-                if (member.bot or 
-                    member.id not in self.emotion_manager.user_emotions or 
-                    member.id not in self.emotion_manager.dm_enabled_users or
-                    # Don't message if user already has a pending message
-                    member.id in self.emotion_manager.pending_messages):
-                    continue
-                
-                last = datetime.fromisoformat(self.emotion_manager.user_emotions[member.id].get('last_interaction', now.isoformat()))
-                if now - last > timedelta(hours=6):
-                    try:
-                        dm = await member.create_dm()
+async def check_inactive_users(self, bot, storage_manager=None):
+    """Check and message inactive users"""
+    now = datetime.now(timezone.utc)
+    for guild in bot.guilds:
+        for member in guild.members:
+            if (member.bot or 
+                member.id not in self.emotion_manager.user_emotions or 
+                member.id not in self.emotion_manager.dm_enabled_users or
+                member.id in self.emotion_manager.pending_messages):
+                continue
+            
+            last = datetime.fromisoformat(self.emotion_manager.user_emotions[member.id].get('last_interaction', now.isoformat()))
+            if now - last > timedelta(hours=6):
+                try:
+                    dm = await member.create_dm()
                     
                     # Get preferred name if available
                     preferred_name = self.conversation_manager.get_preferred_name(member.id)
