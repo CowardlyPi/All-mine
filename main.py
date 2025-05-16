@@ -1858,15 +1858,23 @@ class A2Bot:
             
             await ctx.send("\n".join(results))
 
-@self.bot.command(name="set_stat")
+# First, make sure you have your bot defined
+bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
+
+# Define an emotion_manager and storage_manager at the module level
+emotion_manager = EmotionManager()
+conversation_manager = ConversationManager()
+storage_manager = StorageManager()
+
+@bot.command(name="set_stat")
 @commands.has_permissions(administrator=True)  # Restrict to admins only
 async def set_stat(ctx, stat_name: str, value: float):
     """Admin command to set a specific emotional stat (for testing only)"""
     uid = ctx.author.id
     
     # Initialize user if they don't exist in the system
-    if uid not in self.emotion_manager.user_emotions:
-        self.emotion_manager.user_emotions[uid] = {
+    if uid not in emotion_manager.user_emotions:
+        emotion_manager.user_emotions[uid] = {
             "trust": 0, 
             "resentment": 0, 
             "attachment": 0, 
@@ -1895,23 +1903,23 @@ async def set_stat(ctx, stat_name: str, value: float):
         value = max(0, min(10, value))
     
     # Update the stat
-    self.emotion_manager.user_emotions[uid][stat_name] = value
+    emotion_manager.user_emotions[uid][stat_name] = value
     
     # Save the changes
-    await self.storage_manager.save_data(self.emotion_manager, self.conversation_manager)
+    await storage_manager.save_data(emotion_manager, conversation_manager)
     
     await ctx.send(f"A2: Successfully set your {stat_name} to {value}.")
     
     # Optional: Show the updated relationship stage
-    rel_data = self.emotion_manager.get_relationship_stage(uid)
+    rel_data = emotion_manager.get_relationship_stage(uid)
     await ctx.send(f"A2: Your relationship is now at the '{rel_data['current']['name']}' stage.")
 
-@self.bot.command(name="force_load")
+@bot.command(name="force_load")
 @commands.has_permissions(administrator=True)
 async def force_load(ctx):
     """Force reload all memory data"""
     await ctx.send("A2: Forcing reload of all memory data...")
-    success = await self.storage_manager.load_data(self.emotion_manager, self.conversation_manager)
+    success = await storage_manager.load_data(emotion_manager, conversation_manager)
     if success:
         await ctx.send("A2: Memory reload complete.")
     else:
