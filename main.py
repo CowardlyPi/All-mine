@@ -1727,99 +1727,99 @@ class A2Bot:
             print("All tasks started successfully.")
             print("Dynamic stats system enabled")
             
-    @self.bot.event
-    async def on_message(message):
-        """Handle incoming messages"""
-        if message.author.bot or message.content.startswith("A2:"):
-            return
+        @self.bot.event
+        async def on_message(message):
+            """Handle incoming messages"""
+            if message.author.bot or message.content.startswith("A2:"):
+                return
     
-        uid = message.author.id
-        content = message.content.strip()
+            uid = message.author.id
+            content = message.content.strip()
     
     # Clear pending message status if this user had one
-        if uid in self.emotion_manager.pending_messages:
-            self.emotion_manager.pending_messages.remove(uid)
+            if uid in self.emotion_manager.pending_messages:
+                self.emotion_manager.pending_messages.remove(uid)
     
     # Initialize first interaction time if this is a new user
-        if uid not in self.emotion_manager.user_emotions:
-            now = datetime.now(timezone.utc).isoformat()
-            self.emotion_manager.user_emotions[uid] = {
-                "trust": 0, 
-                "resentment": 0, 
-                "attachment": 0, 
-                "protectiveness": 0,
-                "affection_points": 0, 
-                "annoyance": 0,
-                "first_interaction": now,
-                "last_interaction": now,
-                "interaction_count": 0
-        }
+            if uid not in self.emotion_manager.user_emotions:
+                now = datetime.now(timezone.utc).isoformat()
+                self.emotion_manager.user_emotions[uid] = {
+                    "trust": 0, 
+                    "resentment": 0, 
+                    "attachment": 0, 
+                    "protectiveness": 0,
+                    "affection_points": 0, 
+                    "annoyance": 0,
+                    "first_interaction": now,
+                    "last_interaction": now,
+                    "interaction_count": 0
+            }
     
-        # Get or create user profile with name from Discord
-        self.conversation_manager.get_or_create_profile(uid, message.author.display_name)
-    
-        await self.response_generator.handle_first_message_of_day(message, uid)
-    
-        is_cmd = any(content.startswith(p) for p in self.prefixes)
-        is_mention = self.bot.user in getattr(message, 'mentions', [])
-        is_dm = isinstance(message.channel, discord.DMChannel)
-    
-        if not (is_cmd or is_mention or is_dm):
-            return
-    
-        await self.bot.process_commands(message)
-    
-        if is_cmd:
-            return
-    
-        trust = self.emotion_manager.user_emotions.get(uid, {}).get('trust', 0)
-        resp = await self.response_generator.generate_a2_response(content, trust, uid, self.storage_manager)
-    
-        # Track user's emotional state in history
-        if uid in self.emotion_manager.user_emotions:
-            e = self.emotion_manager.user_emotions[uid]
-            # Initialize emotion history if it doesn't exist
-            if "emotion_history" not in e:
-                e["emotion_history"] = []
+            # Get or create user profile with name from Discord
+            self.conversation_manager.get_or_create_profile(uid, message.author.display_name)
         
-        # Only record history if enough time has passed since last entry
-            if not e["emotion_history"] or (
-                datetime.now(timezone.utc) - 
-                datetime.fromisoformat(e["emotion_history"][-1]["timestamp"])
-            ).total_seconds() > 3600:  # One hour between entries
-                e["emotion_history"].append({
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "trust": e.get("trust", 0),
-                    "attachment": e.get("attachment", 0),
-                    "resentment": e.get("resentment", 0),
-                    "protectiveness": e.get("protectiveness", 0),
-                    "affection_points": e.get("affection_points", 0)
-                })
+            await self.response_generator.handle_first_message_of_day(message, uid)
+        
+            is_cmd = any(content.startswith(p) for p in self.prefixes)
+            is_mention = self.bot.user in getattr(message, 'mentions', [])
+            is_dm = isinstance(message.channel, discord.DMChannel)
+        
+            if not (is_cmd or is_mention or is_dm):
+                return
+        
+            await self.bot.process_commands(message)
+        
+            if is_cmd:
+                return
+        
+            trust = self.emotion_manager.user_emotions.get(uid, {}).get('trust', 0)
+            resp = await self.response_generator.generate_a2_response(content, trust, uid, self.storage_manager)
+        
+            # Track user's emotional state in history
+            if uid in self.emotion_manager.user_emotions:
+                e = self.emotion_manager.user_emotions[uid]
+                # Initialize emotion history if it doesn't exist
+                if "emotion_history" not in e:
+                    e["emotion_history"] = []
             
-            # Keep history at a reasonable size
-                if len(e["emotion_history"]) > 50:
-                    e["emotion_history"] = e["emotion_history"][-50:]
-    
-    # Record interaction data for future analysis
-        await self.emotion_manager.record_interaction_data(uid, content, resp, self.storage_manager)
-    
-    # For longer messages, A2 might sometimes give a thoughtful response
-        if len(content) > 100 and random.random() < 0.3 and trust > 5:
-            await message.channel.send(f"A2: ...")
-            await asyncio.sleep(1.5)
-    
-        await message.channel.send(f"A2: {resp}")
-    
-    # Occasionally respond with a follow-up based on relationship
-        if random.random() < 0.1 and trust > 7:
-            await asyncio.sleep(3)
-            followups = [
-                "Something else?",
-                "...",
-                "Still processing that.",
-                "Interesting.",
-            ]
-            await message.channel.send(f"A2: {random.choice(followups)}")
+            # Only record history if enough time has passed since last entry
+                if not e["emotion_history"] or (
+                    datetime.now(timezone.utc) - 
+                    datetime.fromisoformat(e["emotion_history"][-1]["timestamp"])
+                ).total_seconds() > 3600:  # One hour between entries
+                    e["emotion_history"].append({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "trust": e.get("trust", 0),
+                        "attachment": e.get("attachment", 0),
+                        "resentment": e.get("resentment", 0),
+                        "protectiveness": e.get("protectiveness", 0),
+                        "affection_points": e.get("affection_points", 0)
+                    })
+                
+                # Keep history at a reasonable size
+                    if len(e["emotion_history"]) > 50:
+                        e["emotion_history"] = e["emotion_history"][-50:]
+        
+        # Record interaction data for future analysis
+            await self.emotion_manager.record_interaction_data(uid, content, resp, self.storage_manager)
+        
+        # For longer messages, A2 might sometimes give a thoughtful response
+            if len(content) > 100 and random.random() < 0.3 and trust > 5:
+                await message.channel.send(f"A2: ...")
+                await asyncio.sleep(1.5)
+        
+            await message.channel.send(f"A2: {resp}")
+        
+        # Occasionally respond with a follow-up based on relationship
+            if random.random() < 0.1 and trust > 7:
+                await asyncio.sleep(3)
+                followups = [
+                    "Something else?",
+                    "...",
+                    "Still processing that.",
+                    "Interesting.",
+                ]
+                await message.channel.send(f"A2: {random.choice(followups)}")
     
     def _setup_commands(self):
         """Set up commands for the bot"""
