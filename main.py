@@ -1906,40 +1906,6 @@ class A2Bot:
             rel_data = self.emotion_manager.get_relationship_stage(uid)
             await ctx.send(f"A2: Your relationship is now at the '{rel_data['current']['name']}' stage.")
 
-    @bot.command(name="force_load")
-    @commands.has_permissions(administrator=True)
-    async def force_load(ctx):
-        """Force reload all memory data"""
-        await ctx.send("A2: Forcing reload of all memory data...")
-        success = await storage_manager.load_data(emotion_manager, conversation_manager)
-        if success:
-            await ctx.send("A2: Memory reload complete.")
-        else:
-            await ctx.send("A2: Error reloading memory data.")
-
-        @self.bot.command(name="create_test_memory")
-        async def create_test_memory(ctx):
-            """Create a test memory to verify the memory system is working"""
-            uid = ctx.author.id
-            
-            # Create a test memory
-            memory = await self.emotion_manager.create_memory_event(
-                uid,
-                "test_memory",
-                f"Test memory created on {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}",
-                {"test": 1.0},
-                self.storage_manager
-            )
-            
-            # Force save
-            await self.storage_manager.save_data(self.emotion_manager, self.conversation_manager)
-            
-            # Verify memory was created
-            if uid in self.emotion_manager.user_memories and any(m['type'] == 'test_memory' for m in self.emotion_manager.user_memories[uid]):
-                await ctx.send("A2: Test memory created and saved successfully.")
-            else:
-                await ctx.send("A2: Failed to create test memory.")
-
         @self.bot.command(name="stats")
         async def stats(ctx):
             """Display enhanced, dynamic relationship stats"""
