@@ -49,8 +49,52 @@ RUN echo '#!/usr/bin/env python\nimport os\nimport sys\nfrom pathlib import Path
 # Copy main files
 COPY main.py bot_helper.py config.py patch_openai.py ./
 
-# Run the patch script to fix the OpenAI client initialization
-RUN echo '#!/usr/bin/env python\nimport re\n\n# Read the main.py file\nwith open("main.py", "r") as file:\n    content = file.read()\n\n# Find and replace the OpenAI client initialization\npattern = r"self\\.openai_client = OpenAI\\(\\s*api_key=openai_api_key,\\s*organization=openai_org_id,\\s*project=openai_project_id\\s*\\)"\nreplacement = "self.openai_client = OpenAI(\\n            api_key=openai_api_key,\\n            organization=openai_org_id\\n        )"\n\n# Apply the replacement\nmodified_content = re.sub(pattern, replacement, content)\n\n# Write the modified content back to the file\nwith open("main.py", "w") as file:\n    file.write(modified_content)\n\nprint("Successfully patched main.py to fix OpenAI client initialization!")\n' > /app/patch_openai.py && \
+# Run an improved patch script to fix the OpenAI client initialization
+RUN echo '#!/usr/bin/env python3\n\
+import re\n\
+import os\n\
+\n\
+print("Starting enhanced OpenAI client initialization fix...")\n\
+\n\
+# Make sure main.py exists\n\
+if not os.path.exists("main.py"):\n\
+    print("ERROR: main.py not found")\n\
+    exit(1)\n\
+\n\
+# Read the main.py file\n\
+with open("main.py", "r") as file:\n\
+    content = file.read()\n\
+\n\
+# Find the A2Bot.__init__ method\n\
+init_pattern = r"def __init__\\(self, token, app_id, openai_api_key.*?\\):(.*?)# Initialize managers"\n\
+init_match = re.search(init_pattern, content, re.DOTALL)\n\
+\n\
+if init_match:\n\
+    init_code = init_match.group(1)\n\
+    \n\
+    # Find the OpenAI client initialization\n\
+    openai_pattern = r"self\\.openai_client = OpenAI\\(.*?\\)"\n\
+    openai_match = re.search(openai_pattern, init_code, re.DOTALL)\n\
+    \n\
+    if openai_match:\n\
+        # Replace with the simplest, most compatible initialization\n\
+        new_init = "self.openai_client = OpenAI(api_key=openai_api_key)"\n\
+        \n\
+        # Apply the replacement\n\
+        modified_init = init_code.replace(openai_match.group(0), new_init)\n\
+        modified_content = content.replace(init_code, modified_init)\n\
+        \n\
+        # Write the modified content back to the file\n\
+        with open("main.py", "w") as file:\n\
+            file.write(modified_content)\n\
+        \n\
+        print("Successfully fixed OpenAI client initialization!")\n\
+    else:\n\
+        print("ERROR: Could not find OpenAI client initialization")\n\
+else:\n\
+    print("ERROR: Could not find A2Bot.__init__ method")\n\
+' > /app/patch_openai.py && \
+    chmod +x /app/patch_openai.py && \
     python /app/patch_openai.py
 
 # Create basic healthcheck script
