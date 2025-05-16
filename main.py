@@ -553,25 +553,25 @@ class StorageManager:
         """Save DM permission settings"""
         return await self.save_file(self.dm_settings_file, {"enabled_users": list(dm_enabled_users)})
 
-async def save_data(self, emotion_manager, conversation_manager=None):
-    """Save all emotional and conversation data"""
-    success = True
+    async def save_data(self, emotion_manager, conversation_manager=None):
+        """Save all emotional and conversation data"""
+        success = True
     
-    # Save emotional data for all users
-    for user_id in emotion_manager.user_emotions:
-        profile_success = await self.save_user_profile(user_id, emotion_manager)
-        success = success and profile_success
+        # Save emotional data for all users
+        for user_id in emotion_manager.user_emotions:
+            profile_success = await self.save_user_profile(user_id, emotion_manager)
+            success = success and profile_success
         
-        # Save conversation data if provided
-        if conversation_manager and user_id in conversation_manager.conversations:
-            conv_success = await self.save_conversation(user_id, conversation_manager)
-            success = success and conv_success
+            # Save conversation data if provided
+            if conversation_manager and user_id in conversation_manager.conversations:
+                conv_success = await self.save_conversation(user_id, conversation_manager)
+                success = success and conv_success
             
-            # Save user profile data
-            if user_id in conversation_manager.user_profiles:
-                profile_success = await self.save_user_profile_data(
+                # Save user profile data
+                if user_id in conversation_manager.user_profiles:
+                    profile_success = await self.save_user_profile_data(
                     user_id, conversation_manager.user_profiles[user_id])
-                success = success and profile_success
+                    success = success and profile_success
     
     # Save DM settings
     dm_success = await self.save_dm_settings(emotion_manager.dm_enabled_users)
