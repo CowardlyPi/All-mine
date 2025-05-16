@@ -747,7 +747,7 @@ async def save_data(self, emotion_manager, conversation_manager=None):
     return save_count > 0
 
     class EmotionManager:
-    """Manages all emotional and relationship aspects of the bot"""
+        """Manages all emotional and relationship aspects of the bot"""
     
     def __init__(self):
         # ─── State Storage ────────────────────────────────────────────────────
