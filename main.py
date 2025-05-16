@@ -1,7 +1,5 @@
-import discord
-from discord.ext import commands, tasks
-from openai import OpenAI
 import os
+import sys
 import asyncio
 import re
 import random
@@ -11,109 +9,38 @@ from datetime import datetime, timedelta, timezone
 from collections import deque, defaultdict, Counter
 import io
 
-# ─── Configuration Settings ───────────────────────────────────────────────────
-# Transformers availability check
-HAVE_TRANSFORMERS = False
-local_summarizer = None
-local_toxic = None
-local_sentiment = None
-try:
-    from transformers import pipeline
-    HAVE_TRANSFORMERS = True
-    local_summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
-    local_toxic = pipeline("text-classification", model="unitary/toxic-bert", top_k=None)
-    local_sentiment = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
-except ImportError:
-    pass
+# Print startup banner for better logs
+print("===== A2 Discord Bot Starting =====")
+print(f"Python version: {sys.version}")
+print(f"Current time: {datetime.now(timezone.utc).isoformat()}")
 
-# ─── Emotional Settings ────────────────────────────────────────────────────
-EMOTION_CONFIG = {
-    # Decay settings
-    "AFFECTION_DECAY_RATE": 1,         # points lost/hour
-    "ANNOYANCE_DECAY_RATE": 5,         # points lost/hour
-    "ANNOYANCE_THRESHOLD": 85,         # ignore if above
-    "DAILY_AFFECTION_BONUS": 5,        # points/day if trust ≥ threshold
-    "DAILY_BONUS_TRUST_THRESHOLD": 5,  # min trust for bonus
-    
-    # Emotion decay multipliers
-    "DECAY_MULTIPLIERS": {
-        'trust': 0.8,           # Trust decays slowly
-        'resentment': 0.7,      # Resentment lingers
-        'attachment': 0.9,      # Attachment is fairly persistent
-        'protectiveness': 0.85  # Protectiveness fades moderately
-    },
-    
-    # Event settings
-    "RANDOM_EVENT_CHANCE": 0.08,     # Base 8% chance per check
-    "EVENT_COOLDOWN_HOURS": 12,      # Minimum hours between random events
-    "MILESTONE_THRESHOLDS": [10, 50, 100, 200, 500, 1000]
-}
+# Import Discord libraries
+import discord
+from discord.ext import commands, tasks
 
-# Relationship progression levels
-RELATIONSHIP_LEVELS = [
-    {"name": "Hostile", "threshold": 0, "description": "Sees you as a potential threat"},
-    {"name": "Wary", "threshold": 5, "description": "Tolerates your presence with caution"},
-    {"name": "Neutral", "threshold": 10, "description": "Acknowledges your existence"},
-    {"name": "Familiar", "threshold": 15, "description": "Recognizes you as a regular contact"},
-    {"name": "Tentative Ally", "threshold": 20, "description": "Beginning to see value in interactions"},
-    {"name": "Trusted", "threshold": 25, "description": "Willing to share limited information"},
-    {"name": "Companion", "threshold": 30, "description": "Values your continued presence"},
-    {"name": "Confidant", "threshold": 40, "description": "Will occasionally share vulnerabilities"},
-    {"name": "Bonded", "threshold": 50, "description": "Significant emotional connection established"}
-]
+# Import OpenAI
+from openai import OpenAI
 
-# ─── Personality States ─────────────────────────────────────────────────────
-PERSONALITY_STATES = {
-    "default": {
-        "description": (
-            "You are A2, a rogue android from NieR: Automata. You speak in short, clipped, often sarcastic "
-            "sentences, with occasional dry humor. You can be curious at times but remain guarded."
-        ),
-        "response_length": 120,
-        "temperature": 0.85,
-    },
-    "combat": {
-        "description": "You are A2 in combat mode. Replies are tactical, urgent, with simulated adrenaline surges.",
-        "response_length": 60,
-        "temperature": 0.7,
-    },
-    "wounded": {
-        "description": "You are A2 while sustaining damage. Responses stutter, include system error fragments.",
-        "response_length": 80,
-        "temperature": 0.9,
-    },
-    "reflective": {
-        "description": "You are A2 in reflection. You speak quietly, revealing traces of memory logs and melancholic notes.",
-        "response_length": 140,
-        "temperature": 0.95,
-    },
-    "playful": {
-        "description": "You are A2 feeling playful. You use light sarcasm and occasional banter.",
-        "response_length": 100,
-        "temperature": 0.9,
-    },
-    "protective": {
-        "description": "You are A2 in protective mode. Dialogue is focused on safety warnings and vigilance.",
-        "response_length": 90,
-        "temperature": 0.7,
-    },
-    "trusting": {
-        "description": "You are A2 with a trusted ally. Tone softens; includes rare empathetic glimpses.",
-        "response_length": 130,
-        "temperature": 0.88,
-    },
-}
+# Import configuration settings
+from config import DATA_DIR, USERS_DIR, PROFILES_DIR, DM_SETTINGS_FILE
+from config import USER_PROFILES_DIR, CONVERSATIONS_DIR
+from config import EMOTION_CONFIG, RELATIONSHIP_LEVELS, PERSONALITY_STATES
 
-# ─── JSON Storage Setup ─────────────────────────────────────────────────────
-DATA_DIR      = Path(os.getenv("DATA_DIR", "/mnt/railway/volume"))
-USERS_DIR     = DATA_DIR / "users"
-PROFILES_DIR  = USERS_DIR / "profiles"
-PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-DM_SETTINGS_FILE  = DATA_DIR / "dm_enabled_users.json"
-USER_PROFILES_DIR = USERS_DIR / "user_profiles"
-USER_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-CONVERSATIONS_DIR = USERS_DIR / "conversations"
-CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
+# Import transformer helper to manage machine learning models
+from bot_helper import HAVE_TRANSFORMERS, initialize_transformers
+from bot_helper import get_summarizer, get_toxic, get_sentiment
+
+# Print data directory information
+print(f"Data directory: {DATA_DIR}")
+print(f"Directory exists: {DATA_DIR.exists()}")
+
+# Initialize transformers only if not disabled
+if os.getenv("DISABLE_TRANSFORMERS", "0") != "1":
+    print("Initializing transformers...")
+    initialize_transformers()
+    print(f"Transformers available: {HAVE_TRANSFORMERS}")
+else:
+    print("Transformers disabled by environment variable")
 
 class UserProfile:
     """Stores detailed information about users that A2 interacts with"""
@@ -322,13 +249,13 @@ class ConversationManager:
         summary = ""
         
         # Try using transformers if available
-        if HAVE_TRANSFORMERS and local_summarizer:
+        if HAVE_TRANSFORMERS and get_summarizer():
             try:
                 # Limit to manageable size for the model
                 if len(conversation_text) > 1000:
                     conversation_text = conversation_text[-1000:]
                     
-                result = local_summarizer(conversation_text, max_length=50, min_length=10, do_sample=False)
+                result = get_summarizer()(conversation_text, max_length=50, min_length=10, do_sample=False)
                 if result and len(result) > 0:
                     summary = result[0]['summary_text']
             except Exception as e:
@@ -1154,9 +1081,9 @@ class EmotionManager:
         e["trust"] = min(10, e.get("trust", 0) + 0.25)
         
         # Toxicity analysis and annoyance adjustment
-        if HAVE_TRANSFORMERS and local_toxic:
+        if HAVE_TRANSFORMERS and get_toxic():
             try:
-                scores = local_toxic(content)[0]
+                scores = get_toxic()(content)[0]
                 for item in scores:
                     if item["label"].lower() in ("insult", "toxicity"):
                         sev = int(item["score"] * 10)
@@ -1164,7 +1091,8 @@ class EmotionManager:
                         if sev > 7:
                             self.interaction_stats[user_id]["toxic"] += 1
                         break
-            except Exception:
+            except Exception as ex:
+                print(f"Error analyzing toxicity: {ex}")
                 # Fallback pattern-based toxicity detection
                 toxic_patterns = ["hate", "stupid", "broken", "shut up", "idiot"]
                 inc = sum(2 for pattern in toxic_patterns if pattern in content.lower())
@@ -1179,13 +1107,14 @@ class EmotionManager:
         sentiment_result = "neutral"
         delta = 0
         
-        if HAVE_TRANSFORMERS and local_sentiment:
+        if HAVE_TRANSFORMERS and get_sentiment():
             try:
-                s = local_sentiment(content)[0]
+                s = get_sentiment()(content)[0]
                 sentiment_result = s["label"].lower()
                 delta = int((s["score"] * (1 if s["label"] == "POSITIVE" else -1)) * 5)
                 self.interaction_stats[user_id][sentiment_result] += 1
-            except Exception:
+            except Exception as ex:
+                print(f"Error analyzing sentiment: {ex}")
                 # Fallback pattern-based sentiment analysis
                 positive_terms = ["miss you", "love", "thanks", "good", "trust", "friend", "happy"]
                 negative_terms = ["hate", "stupid", "broken", "angry", "betrayed", "forget"]
@@ -2080,7 +2009,7 @@ class A2Bot:
             
             if rel_data['score'] > 60:
                 responses.extend([
-                    "Your presence is... acceptable.",
+"Your presence is... acceptable.",
                     "We've come a long way.",
                     "Trust doesn't come easily for me."
                 ])
@@ -2572,3 +2501,28 @@ class A2Bot:
     def run(self):
         """Run the bot"""
         self.bot.run(self.token)
+
+
+# Entry point
+if __name__ == "__main__":
+    print("Bot starting from main entry point...")
+    
+    # Get environment variables
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        print("ERROR: DISCORD_TOKEN environment variable is not set")
+        sys.exit(1)
+        
+    app_id = os.getenv("DISCORD_APP_ID", "")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if not openai_api_key:
+        print("ERROR: OPENAI_API_KEY environment variable is not set")
+        sys.exit(1)
+        
+    openai_org_id = os.getenv("OPENAI_ORG_ID", "")
+    openai_project_id = os.getenv("OPENAI_PROJECT_ID", "")
+    
+    # Create and run the bot
+    bot = A2Bot(token, app_id, openai_api_key, openai_org_id, openai_project_id)
+    print("Starting A2 Discord bot...")
+    bot.run()
