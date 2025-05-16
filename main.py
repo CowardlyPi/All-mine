@@ -1773,53 +1773,53 @@ class A2Bot:
             return
     
     trust = self.emotion_manager.user_emotions.get(uid, {}).get('trust', 0)
-    resp = await self.response_generator.generate_a2_response(content, trust, uid, self.storage_manager)
+        resp = await self.response_generator.generate_a2_response(content, trust, uid, self.storage_manager)
     
-    # Track user's emotional state in history
-    if uid in self.emotion_manager.user_emotions:
-        e = self.emotion_manager.user_emotions[uid]
-        # Initialize emotion history if it doesn't exist
-        if "emotion_history" not in e:
-            e["emotion_history"] = []
+        # Track user's emotional state in history
+        if uid in self.emotion_manager.user_emotions:
+            e = self.emotion_manager.user_emotions[uid]
+            # Initialize emotion history if it doesn't exist
+            if "emotion_history" not in e:
+                e["emotion_history"] = []
         
         # Only record history if enough time has passed since last entry
-        if not e["emotion_history"] or (
-            datetime.now(timezone.utc) - 
-            datetime.fromisoformat(e["emotion_history"][-1]["timestamp"])
-        ).total_seconds() > 3600:  # One hour between entries
-            e["emotion_history"].append({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "trust": e.get("trust", 0),
-                "attachment": e.get("attachment", 0),
-                "resentment": e.get("resentment", 0),
-                "protectiveness": e.get("protectiveness", 0),
-                "affection_points": e.get("affection_points", 0)
-            })
+            if not e["emotion_history"] or (
+                datetime.now(timezone.utc) - 
+                datetime.fromisoformat(e["emotion_history"][-1]["timestamp"])
+            ).total_seconds() > 3600:  # One hour between entries
+                e["emotion_history"].append({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "trust": e.get("trust", 0),
+                    "attachment": e.get("attachment", 0),
+                    "resentment": e.get("resentment", 0),
+                    "protectiveness": e.get("protectiveness", 0),
+                    "affection_points": e.get("affection_points", 0)
+                })
             
             # Keep history at a reasonable size
-            if len(e["emotion_history"]) > 50:
-                e["emotion_history"] = e["emotion_history"][-50:]
+                if len(e["emotion_history"]) > 50:
+                    e["emotion_history"] = e["emotion_history"][-50:]
     
     # Record interaction data for future analysis
-    await self.emotion_manager.record_interaction_data(uid, content, resp, self.storage_manager)
+        await self.emotion_manager.record_interaction_data(uid, content, resp, self.storage_manager)
     
     # For longer messages, A2 might sometimes give a thoughtful response
-    if len(content) > 100 and random.random() < 0.3 and trust > 5:
-        await message.channel.send(f"A2: ...")
-        await asyncio.sleep(1.5)
+        if len(content) > 100 and random.random() < 0.3 and trust > 5:
+            await message.channel.send(f"A2: ...")
+            await asyncio.sleep(1.5)
     
-    await message.channel.send(f"A2: {resp}")
+        await message.channel.send(f"A2: {resp}")
     
     # Occasionally respond with a follow-up based on relationship
-    if random.random() < 0.1 and trust > 7:
-        await asyncio.sleep(3)
-        followups = [
-            "Something else?",
-            "...",
-            "Still processing that.",
-            "Interesting.",
-        ]
-        await message.channel.send(f"A2: {random.choice(followups)}")
+        if random.random() < 0.1 and trust > 7:
+            await asyncio.sleep(3)
+            followups = [
+                "Something else?",
+                "...",
+                "Still processing that.",
+                "Interesting.",
+            ]
+            await message.channel.send(f"A2: {random.choice(followups)}")
     
     def _setup_commands(self):
         """Set up commands for the bot"""
