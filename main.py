@@ -737,6 +737,7 @@ class EmotionManager:
         self.relationship_progress = defaultdict(dict)
         self.dm_enabled_users = set()
         self.MAX_RECENT_RESPONSES = 10
+        self.pending_messages = set()
     
     async def create_memory_event(self, user_id, event_type, description, emotional_impact=None, storage_manager=None):
         """Creates a new memory event and stores it"""
@@ -1619,29 +1620,38 @@ class ResponseGenerator:
         now = datetime.now(timezone.utc)
         for guild in bot.guilds:
             for member in guild.members:
-                if member.bot or member.id not in self.emotion_manager.user_emotions or member.id not in self.emotion_manager.dm_enabled_users:
+                if (member.bot or 
+                    member.id not in self.emotion_manager.user_emotions or 
+                    member.id not in self.emotion_manager.dm_enabled_users or
+                    # Don't message if user already has a pending message
+                    member.id in self.emotion_manager.pending_messages):
                     continue
+                
                 last = datetime.fromisoformat(self.emotion_manager.user_emotions[member.id].get('last_interaction', now.isoformat()))
                 if now - last > timedelta(hours=6):
                     try:
                         dm = await member.create_dm()
+                    
+                    # Get preferred name if available
+                    preferred_name = self.conversation_manager.get_preferred_name(member.id)
+                    trust = self.emotion_manager.user_emotions[member.id].get('trust', 0)
+                    
+                    if preferred_name and trust > 5 and random.random() < 0.5:
+                        await dm.send(f"A2: ... {preferred_name}? You there?")
+                    else:
+                        await dm.send("A2: ...")
                         
-                        # Get preferred name if available
-                        preferred_name = self.conversation_manager.get_preferred_name(member.id)
-                        trust = self.emotion_manager.user_emotions[member.id].get('trust', 0)
-                        
-                        if preferred_name and trust > 5 and random.random() < 0.5:
-                            await dm.send(f"A2: ... {preferred_name}? You there?")
-                        else:
-                            await dm.send("A2: ...")
-                    except discord.errors.Forbidden:
-                        self.emotion_manager.dm_enabled_users.discard(member.id)
-                        if storage_manager:
-                            await storage_manager.save_dm_settings(self.emotion_manager.dm_enabled_users)
-        
-        # Save if storage manager is provided
-        if storage_manager:
-            await storage_manager.save_data(self.emotion_manager, self.conversation_manager)
+                    # Mark that this user has a pending message
+                    self.emotion_manager.pending_messages.add(member.id)
+                    
+                except discord.errors.Forbidden:
+                    self.emotion_manager.dm_enabled_users.discard(member.id)
+                    if storage_manager:
+                        await storage_manager.save_dm_settings(self.emotion_manager.dm_enabled_users)
+    
+    # Save if storage manager is provided
+    if storage_manager:
+        await storage_manager.save_data(self.emotion_manager, self.conversation_manager)
 
 class A2Bot:
     """Main A2 bot implementation handling commands and event loops"""
@@ -1718,49 +1728,53 @@ class A2Bot:
             print("All tasks started successfully.")
             print("Dynamic stats system enabled")
             
-        @self.bot.event
-        async def on_message(message):
-            """Handle incoming messages"""
-            if message.author.bot or message.content.startswith("A2:"):
-                return
-            
-            uid = message.author.id
-            content = message.content.strip()
-            
-            # Initialize first interaction time if this is a new user
-            if uid not in self.emotion_manager.user_emotions:
-                now = datetime.now(timezone.utc).isoformat()
-                self.emotion_manager.user_emotions[uid] = {
-                    "trust": 0, 
-                    "resentment": 0, 
-                    "attachment": 0, 
-                    "protectiveness": 0,
-                    "affection_points": 0, 
-                    "annoyance": 0,
-                    "first_interaction": now,
-                    "last_interaction": now,
-                    "interaction_count": 0
-                }
-            
-            # Get or create user profile with name from Discord
-            self.conversation_manager.get_or_create_profile(uid, message.author.display_name)
-            
-            await self.response_generator.handle_first_message_of_day(message, uid)
-            
-            is_cmd = any(content.startswith(p) for p in self.prefixes)
-            is_mention = self.bot.user in getattr(message, 'mentions', [])
-            is_dm = isinstance(message.channel, discord.DMChannel)
-            
-            if not (is_cmd or is_mention or is_dm):
-                return
-            
-            await self.bot.process_commands(message)
-            
-            if is_cmd:
-                return
-            
-            trust = self.emotion_manager.user_emotions.get(uid, {}).get('trust', 0)
-            resp = await self.response_generator.generate_a2_response(content, trust, uid, self.storage_manager)
+    @self.bot.event
+    async def on_message(message):
+        """Handle incoming messages"""
+        if message.author.bot or message.content.startswith("A2:"):
+            return
+    
+        uid = message.author.id
+        content = message.content.strip()
+    
+    # Clear pending message status if this user had one
+        if uid in self.emotion_manager.pending_messages:
+            self.emotion_manager.pending_messages.remove(uid)
+    
+    # Initialize first interaction time if this is a new user
+        if uid not in self.emotion_manager.user_emotions:
+            now = datetime.now(timezone.utc).isoformat()
+            self.emotion_manager.user_emotions[uid] = {
+                "trust": 0, 
+                "resentment": 0, 
+                "attachment": 0, 
+                "protectiveness": 0,
+                "affection_points": 0, 
+                "annoyance": 0,
+                "first_interaction": now,
+                "last_interaction": now,
+                "interaction_count": 0
+        }
+    
+        # Get or create user profile with name from Discord
+        self.conversation_manager.get_or_create_profile(uid, message.author.display_name)
+    
+        await self.response_generator.handle_first_message_of_day(message, uid)
+    
+        is_cmd = any(content.startswith(p) for p in self.prefixes)
+        is_mention = self.bot.user in getattr(message, 'mentions', [])
+        is_dm = isinstance(message.channel, discord.DMChannel)
+    
+        if not (is_cmd or is_mention or is_dm):
+            return
+    
+        await self.bot.process_commands(message)
+    
+        if is_cmd:
+            return
+    
+        trust = self.emotion_manager.user_emotions.get(uid, {}).get('trust', 0)
+        resp = await self.response_generator.generate_a2_response(content, trust, uid, self.storage_manager)
             
             # Track user's emotional state in history
             if uid in self.emotion_manager.user_emotions:
