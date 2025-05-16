@@ -692,7 +692,7 @@ class StorageManager:
         print("Data load complete")
         return profile_count > 0  # Return success indicator
         
-    async def save_data(self, emotion_manager, conversation_manager=None):
+async def save_data(self, emotion_manager, conversation_manager=None):
     """Save all user data with improved error handling"""
     save_count = 0
     error_count = 0
@@ -746,7 +746,7 @@ class StorageManager:
     print(f"Saved {save_count} profiles with {error_count} errors")
     return save_count > 0
 
-class EmotionManager:
+    class EmotionManager:
     """Manages all emotional and relationship aspects of the bot"""
     
     def __init__(self):
