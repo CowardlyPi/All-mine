@@ -1906,16 +1906,16 @@ class A2Bot:
             rel_data = self.emotion_manager.get_relationship_stage(uid)
             await ctx.send(f"A2: Your relationship is now at the '{rel_data['current']['name']}' stage.")
 
-@bot.command(name="force_load")
-@commands.has_permissions(administrator=True)
-async def force_load(ctx):
-    """Force reload all memory data"""
-    await ctx.send("A2: Forcing reload of all memory data...")
-    success = await storage_manager.load_data(emotion_manager, conversation_manager)
-    if success:
-        await ctx.send("A2: Memory reload complete.")
-    else:
-        await ctx.send("A2: Error reloading memory data.")
+    @bot.command(name="force_load")
+    @commands.has_permissions(administrator=True)
+    async def force_load(ctx):
+        """Force reload all memory data"""
+        await ctx.send("A2: Forcing reload of all memory data...")
+        success = await storage_manager.load_data(emotion_manager, conversation_manager)
+        if success:
+            await ctx.send("A2: Memory reload complete.")
+        else:
+            await ctx.send("A2: Error reloading memory data.")
 
         @self.bot.command(name="create_test_memory")
         async def create_test_memory(ctx):
