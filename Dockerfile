@@ -35,7 +35,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir numpy==1.24.3 && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir "openai>=1.3.7" && \
+    pip install --no-cache-dir "httpx==0.24.1" && \
+    pip install --no-cache-dir "openai==1.3.7" && \
     pip install --no-cache-dir "huggingface_hub[hf_xet]"
 
 # Create helper scripts
