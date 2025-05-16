@@ -1772,7 +1772,7 @@ class A2Bot:
         if is_cmd:
             return
     
-      trust = self.emotion_manager.user_emotions.get(uid, {}).get('trust', 0)
+    trust = self.emotion_manager.user_emotions.get(uid, {}).get('trust', 0)
     resp = await self.response_generator.generate_a2_response(content, trust, uid, self.storage_manager)
     
     # Track user's emotional state in history
